@@ -1,0 +1,310 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Configuration;
+using System.Data;
+using System.Data.SqlClient;
+using WebApplication1.GUI;
+
+namespace WebApplication1.BUS
+{
+    public class SV_BUS
+    {
+        string connectionString = ConfigurationManager.ConnectionStrings["QLSVConnectionString"].ConnectionString;
+        SqlCommand cmd;
+        SqlDataReader reader;
+        DataTable dt;
+        SqlDataAdapter da;
+        public SV LayTenTheoMa(string maSV)
+        {
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                string sql = @"select * from SinhVien where MaSV = @sv ";
+                cmd = new SqlCommand(sql,conn);
+                cmd.Parameters.AddWithValue("@sv", maSV);
+                conn.Open();
+                reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    SV sinhvien = new SV()
+                    {
+                        MaSV = (string)reader["MaSV"],
+                        TenSV = (string)reader["TenSV"],
+                        GioiTinh = (bool)reader["GioiTinh"],
+                        NgaySinh = (DateTime)reader["NgaySinh"],
+                        DiaChi = (string)reader["Diachi"],
+                        MaLop = (string)reader["MaLop"]
+                    };
+                    return sinhvien;
+                }
+            }
+
+            return null;
+            
+        }
+        public bool KtrMaSV(string maSV)
+        {
+            string sql = @"select count(*) from SinhVien where MaSV = @msv";
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                cmd = new SqlCommand(sql,conn);
+                cmd.Parameters.AddWithValue("@msv", maSV);
+                int count = (int)cmd.ExecuteScalar();
+                return (count >= 1);
+            }    
+              
+            
+        }
+        public DataTable LayTatCaSV()
+        {
+            dt = new DataTable();
+            SqlConnection connection = new SqlConnection(connectionString);
+            cmd = new SqlCommand("select * from SinhVien", connection);
+            connection.Open();
+             da = new SqlDataAdapter(cmd);
+            da.Fill(dt);
+            return dt;
+          
+        }
+        public DataTable Tim( string malop)
+        {
+            dt = new DataTable();
+            SqlConnection connection = new SqlConnection(connectionString);
+            cmd = new SqlCommand("select * from SinhVien where MaLop='" + malop + "'", connection);
+            connection.Open();
+            da = new SqlDataAdapter(cmd);
+            da.Fill(dt);
+            return dt;
+        }
+        public bool InsertSV(SV sinhvien)
+        {
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                string sql = @"insert into SinhVien(MaSV,TenSV,GioiTinh,NgaySinh,Diachi,MaLop)values(@masv,@tensv,@gt,@ngaysinh,@diachi,@malop)";
+                SqlCommand cmd = new SqlCommand(sql,conn);
+                cmd.Parameters.AddWithValue("@masv", sinhvien.MaSV);
+                cmd.Parameters.AddWithValue("@tensv", sinhvien.TenSV);
+                cmd.Parameters.AddWithValue("@gt", sinhvien.GioiTinh);
+                cmd.Parameters.AddWithValue("@ngaysinh", sinhvien.NgaySinh);
+                cmd.Parameters.AddWithValue("@diachi", sinhvien.DiaChi);
+                cmd.Parameters.AddWithValue("@malop", sinhvien.MaLop);
+                conn.Open();
+                int result = cmd.ExecuteNonQuery();
+                return (result >= 1);
+            }    
+                
+           
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using WebApplication1.BUS;
+using WebApplication1.GUI;
+
+namespace WebApplication1
+{
+    public partial class Sinhvien : System.Web.UI.Page
+    {
+        SV_BUS sv_BUS = new SV_BUS();
+        protected void Page_Load(object sender, EventArgs e)
+        {
+            if (!IsPostBack)
+            {
+                LayDulieuVaoGridView();
+                LayDulieuVaoGridView1();
+            }
+        }
+
+      
+        private void DoDuLieuLenForm(SV masv)
+        {
+            txtmasv.Text = masv.MaSV;
+            txtname.Text = masv.TenSV;
+            rblList1.SelectedIndex = masv.GioiTinh ? 1 : 0;
+
+            txtdate.Text = masv.NgaySinh.ToString("dd/MM/yyyy");
+            txtaddress.Text = masv.DiaChi;
+            dropdllSV.SelectedValue = masv.MaLop;
+
+
+        }
+        private void LayDulieuVaoGridView1()
+        {
+            sv_BUS = new SV_BUS();
+            grSV.DataSource = sv_BUS.LayTatCaSV();
+            grSV.DataBind();
+        }
+        private void LayDulieuVaoGridView()
+        {
+            string malop = dropdllSV.SelectedValue;
+            grSV.DataSource = sv_BUS.Tim(malop);
+            grSV.DataBind();
+        }
+        public SV LayDuLieuTuForm()
+        {
+            bool gioiTinh = Boolean.Parse(rblList1.SelectedValue.ToString());
+            DateTime ngaySinh = DateTime.Parse(txtdate.Text);
+            SV sv = new SV
+            {
+                MaSV = txtmasv.Text,
+                TenSV = txtname.Text,
+                GioiTinh = gioiTinh,
+                NgaySinh = ngaySinh,
+                DiaChi = txtaddress.Text,
+                MaLop = dropdllSV.SelectedValue
+        };
+            return sv;
+        }
+     
+        protected void grSV_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            string sv = grSV.SelectedRow.Cells[0].Text;
+            SV masv = sv_BUS.LayTenTheoMa(sv);
+            if (masv != null)
+            {
+                DoDuLieuLenForm(masv);
+            }
+        }
+
+        protected void btnThemSV_Click(object sender, EventArgs e)
+        {
+            SV sv = LayDuLieuTuForm();
+            bool exist = sv_BUS.KtrMaSV(sv.MaSV);
+            if (exist)
+            {
+                lblMessage.Text = "Mã môn đã tồn tại";
+            }
+            else
+            {
+                bool result = sv_BUS.InsertSV(sv);
+                if (result)
+                {
+                    lblMessage.Text = "Thêm thành công";
+                    LayDulieuVaoGridView();
+                }
+                else
+                {
+                    lblMessage.Text = "Vui lòng thử lại.";
+                }
+            }
+        }
+        public void reset()
+        {
+            grSV.DataSource = null;
+            grSV.DataBind();
+        }
+        protected void dropdllSV_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            reset();
+            string malop = dropdllSV.SelectedValue;
+            grSV.DataSource = sv_BUS.Tim(malop);
+            grSV.DataBind();
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+namespace WebApplication1.GUI
+{
+    public class SV
+    {
+        private string maSV;
+        private string tenSV;
+        private bool gioiTinh;
+        private DateTime ngaySinh;
+        private string diaChi;
+        private string maLop;
+        public SV()
+        {
+            maSV = "";
+            tenSV = "";
+            gioiTinh = true;
+            ngaySinh = DateTime.Today;
+            diaChi = "";
+            maLop = "";
+        }
+        public SV(string ma, string ten, bool gt, DateTime ns, string dc, string malop)
+        {
+            maSV = ma;
+            tenSV = ten;
+            diaChi = dc;
+            gioiTinh = gt;
+            maLop = malop;
+            ngaySinh = ns;
+
+        }
+        public string MaSV
+        {
+            get { return maSV; }
+            set { maSV = value; }
+        }
+        public string TenSV
+        {
+            get { return tenSV; }
+            set { tenSV = value; }
+        }
+        public bool GioiTinh
+        {
+            get { return gioiTinh; }
+            set { gioiTinh = value; }
+        }
+        public DateTime NgaySinh
+        {
+            get { return ngaySinh; }
+            set { ngaySinh = value; }
+        }
+        public string DiaChi
+        {
+            get { return diaChi; }
+            set { diaChi = value; }
+        }
+        public string MaLop
+        {
+            get { return maLop; }
+            set { maLop = value; }
+        }
+    }
+}
